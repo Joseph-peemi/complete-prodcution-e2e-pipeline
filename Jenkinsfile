@@ -24,5 +24,15 @@ pipeline {
                 ])
             }
         }
+        stage("Build with Maven") {
+            steps {
+                sh "mvn clean package -DskipTests"
+            }
+        }
+         stage("Run Tests with Maven") {
+            steps {
+                sh "mvn test"
+            }
+        }
     }
 }
