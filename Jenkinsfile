@@ -14,7 +14,14 @@ pipeline {
         }
         stage("Checkout from SCM") {
             steps {
-                git branch: 'main', credentialsId: 'github', url: 'https://github.com/Joseph-peemi/complete-prodcution-e2e-pipeline.git'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/Joseph-peemi/complete-prodcution-e2e-pipeline.git',
+                        credentialsId: 'github'
+                    ]]
+                ])
             }
         }
     }
