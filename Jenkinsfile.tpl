@@ -4,7 +4,7 @@ pipeline{
     }
     tools {
         jdk 'Java17'
-        maven 'Maven3'
+        maven 'Maven3' 
     }
     environment {
         APP_NAME = "complete-prodcution-e2e-pipeline"
@@ -26,7 +26,7 @@ pipeline{
     
         stage("Checkout from SCM"){
             steps {
-                git branch: 'main', credentialsId: 'github', url: 'https://github.com/dmancloud/complete-prodcution-e2e-pipeline'
+                git branch: 'main', credentialsId: 'github', url: 'https://github.com/Joseph-peemi/complete-prodcution-e2e-pipeline.git'
             }
 
         }
