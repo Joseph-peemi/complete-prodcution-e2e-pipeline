@@ -6,6 +6,14 @@ pipeline {
         jdk 'Java17'
         maven 'Maven3'
     }
+    environment {
+        APP_NAME = "complete-production-e2e-pipeline"
+        RELEASE_VERSION = "1.0.0"
+        DOCKER_USER = "abuchijoe"
+        DOCKER_PASSWORD = "dockerhub"
+        IMAGE_NAME = "$DOCKER_USER/$APP_NAME:$RELEASE_VERSION"
+        IMAGE_TAG = "$DOCKER_USER/$APP_NAME:$RELEASE_VERSION"
+    }
     stages {
         stage("Cleanup Workspace") {
             steps {
@@ -29,7 +37,7 @@ pipeline {
                 sh "mvn clean package -DskipTests"
             }
         }
-         stage("Run Tests with Maven") {
+        stage("Run Tests with Maven") {
             steps {
                 sh "mvn test"
             }
@@ -41,10 +49,28 @@ pipeline {
                 }
             }
         }
-        stage("quality gate") {
+        stage("Quality Gate") {
             steps {
                 timeout(time: 1, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: false, credentialsId: 'jenkins-sonarqube-token'
+                }
+            }
+        }
+        stage("Build Docker Image") {
+            steps {
+                sh "docker build -t $IMAGE_NAME ."
+            }
+        }
+        stage("Push Docker Image") {
+            steps {
+                script {
+                    docker.withRegistry('', DOCKER_PASSWORD) {
+                        docker_image = docker.build "${IMAGE_NAME}"
+                    }
+                    docker.withRegistry('', DOCKER_PASSWORD) {
+                        docker_image.push("$RELEASE_VERSION")
+                        docker_image.push("latest")
+                    }
                 }
             }
         }
