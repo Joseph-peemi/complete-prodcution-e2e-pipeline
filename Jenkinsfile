@@ -75,7 +75,7 @@ pipeline {
                           -H 'Cache-Control: no-cache' \
                           -H 'Content-Type: application/x-www-form-urlencoded' \
                           --data 'IMAGE_TAG=${env.APP_NAME}:${env.RELEASE_VERSION}' \
-                          'https://myjenkins.ucheada.xyz/job/gitops-complete-pipeline/buildWithParameters'
+                          'https://github.com/Joseph-peemi/job/gitops-complete-pipeline/buildWithParameters'
                     """
                 }
             }
