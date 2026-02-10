@@ -51,7 +51,7 @@ pipeline {
         stage("Build Docker Image") {
             steps {
                 script {
-                    IMAGE_NAME = "${env.APP_NAME}:${env.RELEASE_VERSION}"
+                    IMAGE_NAME = "abuchijoe/complete-production-e2e-pipeline:${env.RELEASE_VERSION}"
                     sh "docker build -t ${IMAGE_NAME} ."
                 }
             }
@@ -60,7 +60,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', env.DOCKER_CREDENTIALS) {
-                        def img = docker.image("${env.APP_NAME}:${env.RELEASE_VERSION}")
+                        def img = docker.image("abuchijoe/complete-production-e2e-pipeline:${env.RELEASE_VERSION}")
                         img.push("${env.RELEASE_VERSION}")
                         img.push("latest")
                     }
