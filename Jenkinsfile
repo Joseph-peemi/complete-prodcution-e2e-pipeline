@@ -9,22 +9,20 @@ pipeline {
         RELEASE_VERSION = "1.0.0"
         GIT_CREDENTIALS = "github"
         SONAR_CREDENTIALS = "jenkins-sonarqube-token"
-        DOCKER_CREDENTIALS = "dockerhub"
-        JENKINS_API_TOKEN_CRED = "jenkins-api-token"
-        DOCKER_USER = "abuchijoe"
-        IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
+        DOCKER_CREDENTIALS = "dockerhub" // Jenkins credentials id for Docker Hub (username/password)
+        JENKINS_API_TOKEN_CRED = "${JENKINS_API_TOKEN}"     // Jenkins token credential id (string) for API authentication  
     }
     stages {
         stage("Cleanup Workspace") {
             steps { cleanWs() }
         }
-        stage("Checkout App Repo") {
+        stage("Checkout from SCM") {
             steps {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/Joseph-peemi/complete-production-e2e-pipeline.git',
+                        url: 'https://github.com/Joseph-peemi/complete-prodcution-e2e-pipeline.git',
                         credentialsId: env.GIT_CREDENTIALS
                     ]]
                 ])
@@ -33,12 +31,12 @@ pipeline {
         stage("Build with Maven") {
             steps { sh "mvn clean package -DskipTests" }
         }
-        stage("Run Tests") {
+        stage("Run Tests with Maven") {
             steps { sh "mvn test" }
         }
         stage("SonarQube Analysis") {
             steps {
-                withSonarQubeEnv(env.SONAR_CREDENTIALS) {
+                withSonarQubeEnv('sonarqube-server') {
                     sh "mvn sonar:sonar"
                 }
             }
@@ -53,7 +51,8 @@ pipeline {
         stage("Build Docker Image") {
             steps {
                 script {
-                    sh "docker build -t ${IMAGE_NAME}:${RELEASE_VERSION} ."
+                    IMAGE_NAME = "abuchijoe/complete-production-e2e-pipeline:${env.RELEASE_VERSION}"
+                    sh "docker build -t ${IMAGE_NAME} ."
                 }
             }
         }
@@ -61,21 +60,21 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', env.DOCKER_CREDENTIALS) {
-                        def img = docker.image("${IMAGE_NAME}:${RELEASE_VERSION}")
-                        img.push("${RELEASE_VERSION}")
+                        def img = docker.image("abuchijoe/complete-production-e2e-pipeline:${env.RELEASE_VERSION}")
+                        img.push("${env.RELEASE_VERSION}")
                         img.push("latest")
                     }
                 }
             }
         }
-        stage("Trigger GitOps Pipeline") {
+        stage("Trigger CD Pipeline") {
             steps {
                 withCredentials([string(credentialsId: env.JENKINS_API_TOKEN_CRED, variable: 'JENKINS_API_TOKEN')]) {
                     sh """
                         curl -v -k --user admin:${JENKINS_API_TOKEN} \
                           -H 'Cache-Control: no-cache' \
                           -H 'Content-Type: application/x-www-form-urlencoded' \
-                          --data 'RELEASE_VERSION=${RELEASE_VERSION}' \
+                          --data 'IMAGE_TAG=${env.APP_NAME}:${env.RELEASE_VERSION}' \
                           'https://myjenkins.ucheada.xyz/job/gitops-complete-pipeline/buildWithParameters'
                     """
                 }
@@ -83,6 +82,8 @@ pipeline {
         }
     }
     post {
-        always { cleanWs() }
+        always {
+            cleanWs()
+        }
     }
 }
