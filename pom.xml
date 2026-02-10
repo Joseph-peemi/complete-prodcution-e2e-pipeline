@@ -82,3 +82,4 @@
 	</build>
 
 </project>
+# This is a Maven POM file for a Spring Boot application named "demoapp". It includes dependencies for Spring Boot starters, H2 database, testing, SnakeYAML, Log4j, PostgreSQL, and Thymeleaf. The build section configures the Spring Boot Maven plugin to repackage the application with a final name of "demoapp".
