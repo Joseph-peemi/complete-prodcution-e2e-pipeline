@@ -9,8 +9,9 @@ pipeline {
         RELEASE_VERSION = "1.0.0"
         GIT_CREDENTIALS = "github"
         SONAR_CREDENTIALS = "jenkins-sonarqube-token"
-        DOCKER_CREDENTIALS = "dockerhub" // Jenkins credentials id for Docker Hub (username/password)
-        JENKINS_API_TOKEN_CRED = "jenkins-api-token"     // Jenkins token credential id (string) for API authentication
+        DOCKER_CREDENTIALS = "dockerhub"
+        // NEW: Credential ID for the remote trigger token (create this in Jenkins)
+        CD_TRIGGER_TOKEN_CRED = "cd-pipeline-remote-token"
     }
     stages {
         stage("Cleanup Workspace") {
@@ -69,14 +70,21 @@ pipeline {
         }
         stage("Trigger CD Pipeline") {
             steps {
-                withCredentials([string(credentialsId: env.JENKINS_API_TOKEN_CRED, variable: 'JENKINS_API_TOKEN')]) {
-                    sh """
-                        curl -v -k --user admin:${JENKINS_API_TOKEN} \
-                          -H 'Cache-Control: no-cache' \
-                          -H 'Content-Type: application/x-www-form-urlencoded' \
-                          --data 'IMAGE_TAG=${env.APP_NAME}:${env.RELEASE_VERSION}' \
-                          'https://github.com/Joseph-peemi/job/gitops-complete-pipeline/buildWithParameters'
-                    """
+                withCredentials([string(credentialsId: env.CD_TRIGGER_TOKEN_CRED, variable: 'REMOTE_TOKEN')]) {
+                    script {
+                        echo "Triggering CD pipeline with IMAGE_TAG = ${APP_NAME}:${RELEASE_VERSION}"
+                        try {
+                            build job: 'gitops-complete-pipeline',
+                                  parameters: [string(name: 'IMAGE_TAG', value: "${APP_NAME}:${RELEASE_VERSION}")],
+                                  wait: false,
+                                  propagate: false,
+                                  token: "${REMOTE_TOKEN}"
+                            echo "CD pipeline triggered successfully"
+                        } catch (Exception e) {
+                            echo "Failed to trigger CD pipeline: ${e.getMessage()}"
+                            error "Trigger failed"
+                        }
+                    }
                 }
             }
         }
