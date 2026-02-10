@@ -1,7 +1,5 @@
 pipeline {
-    agent {
-        label "jenkins-agent"
-    }
+    agent { label "jenkins-agent" }
     tools {
         jdk 'Java17'
         maven 'Maven3'
@@ -9,16 +7,14 @@ pipeline {
     environment {
         APP_NAME = "complete-production-e2e-pipeline"
         RELEASE_VERSION = "1.0.0"
-        DOCKER_USER = "abuchijoe"
-        DOCKER_PASSWORD = "dockerhub"
-        IMAGE_NAME = "$DOCKER_USER/$APP_NAME:$RELEASE_VERSION"
-        IMAGE_TAG = "$DOCKER_USER/$APP_NAME:$RELEASE_VERSION"
+        GIT_CREDENTIALS = "github"
+        SONAR_CREDENTIALS = "jenkins-sonarqube-token"
+        DOCKER_CREDENTIALS = "dockerhub-credentials-id" // Jenkins credentials id for Docker Hub (username/password)
+        JENKINS_API_TOKEN_CRED = "JENKINS_API_TOKEN_CRED"     // Jenkins token credential id (string) for API authentication  
     }
     stages {
         stage("Cleanup Workspace") {
-            steps {
-                cleanWs()
-            }
+            steps { cleanWs() }
         }
         stage("Checkout from SCM") {
             steps {
@@ -27,52 +23,67 @@ pipeline {
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/Joseph-peemi/complete-prodcution-e2e-pipeline.git',
-                        credentialsId: 'github'
+                        credentialsId: env.GIT_CREDENTIALS
                     ]]
                 ])
             }
         }
         stage("Build with Maven") {
-            steps {
-                sh "mvn clean package -DskipTests"
-            }
+            steps { sh "mvn clean package -DskipTests" }
         }
         stage("Run Tests with Maven") {
-            steps {
-                sh "mvn test"
-            }
+            steps { sh "mvn test" }
         }
         stage("SonarQube Analysis") {
             steps {
-                withSonarQubeEnv(installationName: 'sonarqube-server', credentialsId: 'jenkins-sonarqube-token') {
-                    sh "mvn sonar:sonar"
+                withSonarQubeEnv('sonarqube-server') {
+                    sh "mvn sonar:sonar -Dsonar.login=${SONAR_CREDENTIALS}"
                 }
             }
         }
         stage("Quality Gate") {
             steps {
                 timeout(time: 1, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'jenkins-sonarqube-token'
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
         stage("Build Docker Image") {
             steps {
-                sh "docker build -t $IMAGE_NAME ."
+                script {
+                    IMAGE_NAME = "${env.APP_NAME}:${env.RELEASE_VERSION}"
+                    sh "docker build -t ${IMAGE_NAME} ."
+                }
             }
         }
         stage("Push Docker Image") {
             steps {
                 script {
-                    docker.withRegistry('', DOCKER_PASSWORD) {
-                        docker_image = docker.build "${IMAGE_NAME}"
-                    }
-                    docker.withRegistry('', DOCKER_PASSWORD) {
-                        docker_image.push("$RELEASE_VERSION")
-                        docker_image.push("latest")
+                    docker.withRegistry('https://index.docker.io/v1/', env.DOCKER_CREDENTIALS) {
+                        def img = docker.image("${env.APP_NAME}:${env.RELEASE_VERSION}")
+                        img.push("${env.RELEASE_VERSION}")
+                        img.push("latest")
                     }
                 }
             }
+        }
+        stage("Trigger CD Pipeline") {
+            steps {
+                withCredentials([string(credentialsId: env.JENKINS_API_TOKEN_CRED, variable: 'JENKINS_API_TOKEN')]) {
+                    sh """
+                        curl -v -k --user admin:${JENKINS_API_TOKEN} \
+                          -H 'Cache-Control: no-cache' \
+                          -H 'Content-Type: application/x-www-form-urlencoded' \
+                          --data 'IMAGE_TAG=${env.APP_NAME}:${env.RELEASE_VERSION}' \
+                          'https://myjenkins.ucheada.xyz/job/gitops-complete-pipeline/buildWithParameters'
+                    """
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
         }
     }
 }
