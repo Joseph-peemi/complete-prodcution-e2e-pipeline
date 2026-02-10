@@ -10,7 +10,7 @@ pipeline {
         GIT_CREDENTIALS = "github"
         SONAR_CREDENTIALS = "jenkins-sonarqube-token"
         DOCKER_CREDENTIALS = "dockerhub" // Jenkins credentials id for Docker Hub (username/password)
-        JENKINS_API_TOKEN_CRED = "${JENKINS_API_TOKEN}"     // Jenkins token credential id (string) for API authentication  
+        JENKINS_API_TOKEN_CRED = "jenkins-api-token"     // Jenkins token credential id (string) for API authentication
     }
     stages {
         stage("Cleanup Workspace") {
